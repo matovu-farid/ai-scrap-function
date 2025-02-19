@@ -65,3 +65,8 @@ functions:
   ai-scrap:
     timeout: 900
     handler: src/index.handler
+    events:
+      - sqs:
+          arn: ${env:QUEUE_ARN}
+          batchSize: 1
+

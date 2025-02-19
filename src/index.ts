@@ -1,6 +1,9 @@
 import { aiMessageSchema } from "./schemas/aiMessage";
 import { scrape } from "./scrape";
 import type { SQSEvent, Context, Callback } from "aws-lambda";
+import { HostData, hostDataSchema } from "./schemas/hostdata";
+import { getCache } from "./entites/cache";
+import { publishWebhook } from "./utils/publishWebhook";
 
 export async function handler(
   event: SQSEvent,
@@ -12,7 +15,23 @@ export async function handler(
     const data = JSON.parse(record.body);
 
     const { host, prompt } = aiMessageSchema.parse(data);
-    await scrape(host, prompt);
+
+    const results = await scrape(host, prompt);
+    const cache = await getCache<HostData>(host, hostDataSchema);
+    if (!cache || !results) {
+      return;
+    }
+    await publishWebhook(
+      cache.callbackUrl,
+      {
+        type: "scraped",
+        data: {
+          url: host,
+          results,
+        },
+      },
+      cache.signSecret
+    );
   });
   done(null, {
     statusCode: 200,
